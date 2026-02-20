@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Star, Info, AlertTriangle, ArrowRight, ShieldCheck, Zap, Sparkles, Database, BookOpen, Target, Heart, TrendingUp, MessageSquareQuote, Loader2, User } from 'lucide-react';
+import { Star, ArrowRight, Database, Target, Heart, TrendingUp, Zap, Sparkles, AlertTriangle, BookOpen } from 'lucide-react';
 
 const AWAKENING_COSTS = [
   { from: 0, to: 1, cost: 50, label: "★1解放" },
@@ -15,11 +15,6 @@ const App = () => {
   const [charStones, setCharStones] = useState(90);
   const [universalStones, setUniversalStones] = useState(0);
   const [priorityMode, setPriorityMode] = useState('optimal'); // 'optimal' or 'uni_priority'
-  
-  // AI related states
-  const [charName, setCharName] = useState("");
-  const [aiAnalysis, setAiAnalysis] = useState("");
-  const [isAiLoading, setIsAiLoading] = useState(false);
 
   const simulation = useMemo(() => {
     const relevantCosts = AWAKENING_COSTS.filter(
@@ -31,7 +26,6 @@ const App = () => {
     let bestResult = null;
     const n = relevantCosts.length;
 
-    // 2^nパターンの全探索で最適解を導出
     for (let i = 0; i < (1 << n); i++) {
       let usedChar = 0;
       let usedUni = 0;
@@ -57,10 +51,8 @@ const App = () => {
       if (isCharPossible) {
         const getScore = () => {
           if (priorityMode === 'optimal') {
-            // 最適化: 不足最小 > 万能消費最小 > 固有余り最小
             return (currentShortage * 10000000) + (actualUniFromStock * 10000) + (charStones - usedChar);
           } else {
-            // 温存: 不足最小 > 固有消費最小 > 万能消費最大
             return (currentShortage * 10000000) + (usedChar * 10000) + (universalStones - actualUniFromStock);
           }
         };
@@ -85,52 +77,6 @@ const App = () => {
     return bestResult;
   }, [currentLevel, targetLevel, charStones, universalStones, priorityMode]);
 
-  // Gemini APIを使用したAI相談機能
-  const askAI = async () => {
-    if (!charName) return;
-    setIsAiLoading(true);
-    const apiKey = ""; // 実行環境から提供される
-    
-    const systemPrompt = `あなたは『キン肉マン 極・タッグ乱舞』のトップランカー軍師「たけぷり」です。分析的、論理的、かつ情熱的な口調で、ユーザーの覚醒計画にアドバイスしてください。
-    口癖は「この編成の肝は…」「リソースを集中すべきは…」「環境的に見て…」です。
-    ユーザーの現在の計画：超人「${charName}」を★${currentLevel}から★${targetLevel}へ覚醒させようとしています。
-    計算上の不足：万能石が${simulation?.shortage}個不足しています。
-    現在の上位メタを考慮した「たけぷりAI軍師」としてのアドバイスを150文字程度で簡潔に返してください。`;
-
-    const userQuery = `軍師、私の「${charName}」の覚醒計画を診断してください。`;
-
-    const fetchWithRetry = async (retries = 5, delay = 1000) => {
-      try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: userQuery }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] }
-          })
-        });
-        if (!response.ok) throw new Error('API Error');
-        const data = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text;
-      } catch (error) {
-        if (retries > 0) {
-          await new Promise(res => setTimeout(res, delay));
-          return fetchWithRetry(retries - 1, delay * 2);
-        }
-        throw error;
-      }
-    };
-
-    try {
-      const result = await fetchWithRetry();
-      setAiAnalysis(result);
-    } catch (error) {
-      setAiAnalysis("エラーが発生した。通信環境を確認するか、後でもう一度相談に来い。");
-    } finally {
-      setIsAiLoading(false);
-    }
-  };
-
   const getProTip = () => {
     if (!simulation) return "まずは目標を設定してくれ。";
     if (simulation.shortage > 0) {
@@ -141,35 +87,31 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-zinc-50 font-sans text-zinc-900 pb-12">
-      {/* Sticky Header */}
       <header className="sticky top-0 z-50 bg-red-600 text-white px-4 py-4 shadow-lg flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="bg-white/20 p-1.5 rounded-lg">
             <Sparkles className="text-yellow-300" size={20} />
           </div>
-          <h1 className="text-lg font-bold italic leading-none">たけぷりAI軍師の相談所</h1>
+          <h1 className="text-lg font-bold italic leading-none text-white">たけぷり覚醒計算機</h1>
         </div>
-        <div className="text-[10px] font-black bg-black/20 px-2 py-1 rounded border border-white/20 uppercase tracking-widest">AI Strategist v4.2</div>
+        <div className="text-[10px] font-black bg-black/20 px-2 py-1 rounded border border-white/20 uppercase tracking-widest">PRO STRATEGIST v5.0</div>
       </header>
 
       <main className="max-w-md mx-auto p-4 space-y-6 mt-2">
-        
-        {/* Quick Guide Panel */}
         <section className="bg-white rounded-2xl p-4 shadow-sm border border-zinc-200">
-          <div className="flex items-center gap-2 mb-3">
-            <BookOpen size={16} className="text-zinc-400" />
-            <span className="text-xs font-black text-zinc-400 tracking-widest uppercase italic">Strategy Flow</span>
+          <div className="flex items-center gap-2 mb-3 text-zinc-400">
+            <BookOpen size={16} />
+            <span className="text-xs font-black tracking-widest uppercase italic">Simulation Flow</span>
           </div>
           <div className="flex justify-between items-center text-[10px] font-bold text-zinc-500 px-2">
             <div className="flex flex-col items-center gap-1"><div className="w-6 h-6 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xs">1</div>★設定</div>
             <ArrowRight size={14} className="text-zinc-300" />
             <div className="flex flex-col items-center gap-1"><div className="w-6 h-6 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xs">2</div>石入力</div>
             <ArrowRight size={14} className="text-zinc-300" />
-            <div className="flex flex-col items-center gap-1"><div className="w-6 h-6 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xs">3</div>軍師相談</div>
+            <div className="flex flex-col items-center gap-1"><div className="w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center text-xs shadow-sm">3</div>結果確認</div>
           </div>
         </section>
 
-        {/* Level Configuration */}
         <section className="bg-white rounded-2xl p-5 shadow-sm border border-zinc-200 space-y-4">
           <div className="flex items-center gap-2 text-sm font-bold text-zinc-700">
             <Star size={18} className="text-orange-400" fill="currentColor" />
@@ -204,7 +146,6 @@ const App = () => {
           </div>
         </section>
 
-        {/* Stone Inputs */}
         <section className="bg-white rounded-2xl p-5 shadow-sm border border-zinc-200 grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <label className="text-[10px] font-black text-red-500 uppercase tracking-widest flex items-center gap-1 ml-1">
@@ -234,7 +175,6 @@ const App = () => {
           </div>
         </section>
 
-        {/* Strategy Plan Switch */}
         <section className="space-y-2">
           <div className="flex items-center gap-2 text-xs font-black text-zinc-400 uppercase tracking-widest ml-1">
             <Target size={14} /> 適用する作戦
@@ -257,7 +197,6 @@ const App = () => {
           </div>
         </section>
 
-        {/* Shortage Panel */}
         {simulation && (
           <section className="bg-zinc-900 rounded-3xl p-6 text-white shadow-xl border-b-8 border-orange-600 flex justify-between items-center relative overflow-hidden">
             <div className="relative z-10">
@@ -271,11 +210,10 @@ const App = () => {
           </section>
         )}
 
-        {/* Route Breakdown */}
         <section className="bg-white rounded-2xl p-5 shadow-sm border border-zinc-200 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-black text-zinc-400 flex items-center gap-2 uppercase tracking-widest"><Zap size={14} className="text-yellow-500" /> ルート内訳</h3>
-            <span className="text-[9px] bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded font-bold italic">Generated Logic</span>
+            <span className="text-[9px] bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded font-bold italic">Logic Activated</span>
           </div>
           <div className="space-y-2">
             {simulation?.steps.map((step, idx) => (
@@ -297,94 +235,28 @@ const App = () => {
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-2 gap-3 pt-4 border-t border-zinc-100">
-            <div className="bg-zinc-50 rounded-xl p-3 text-center border border-zinc-100">
-              <p className="text-[9px] font-black text-zinc-400 uppercase mb-1">固有残り</p>
-              <p className="text-xl font-black text-red-600">{simulation?.remainingChar || 0}</p>
-            </div>
-            <div className="bg-zinc-50 rounded-xl p-3 text-center border border-zinc-100">
-              <p className="text-[9px] font-black text-zinc-400 uppercase mb-1">万能残り</p>
-              <p className="text-xl font-black text-blue-600">{simulation?.remainingUni || 0}</p>
-            </div>
-          </div>
         </section>
 
-        {/* Quick Advice Bar */}
-        <section className="bg-zinc-900 rounded-3xl p-5 text-white shadow-lg relative overflow-hidden">
+        <section className="bg-zinc-900 rounded-3xl p-5 text-white shadow-lg relative overflow-hidden border-2 border-red-600/30">
           <div className="flex gap-4 relative z-10 items-start">
-            <div className="bg-red-600 p-2.5 rounded-2xl shadow-lg flex-shrink-0 animate-pulse">
-              <Star size={20} fill="white" className="text-white" />
+            <div className="bg-red-600 p-2.5 rounded-2xl shadow-lg flex-shrink-0">
+              <Zap size={20} fill="white" className="text-white" />
             </div>
             <div className="space-y-1">
-              <h4 className="text-[10px] font-black text-red-500 tracking-[0.2em] uppercase leading-none mb-1">たけぷりの助言</h4>
+              <h4 className="text-[10px] font-black text-red-500 tracking-[0.2em] uppercase leading-none mb-1">軍師の固定助言</h4>
               <p className="text-xs leading-relaxed text-zinc-200 font-medium italic">
                 「{getProTip()}」
               </p>
             </div>
           </div>
         </section>
-
-        {/* ✨ たけぷりAI軍師の戦略相談 ✨ */}
-        <section className="bg-white rounded-[2rem] p-1.5 shadow-2xl border-2 border-red-500/20 overflow-hidden">
-          <div className="p-5 bg-red-50/50 border-b border-red-100 flex items-center justify-between rounded-t-[1.8rem]">
-            <div className="flex items-center gap-2">
-              <Sparkles className="text-red-600" size={20} />
-              <span className="text-base font-black text-red-700 italic tracking-tighter">たけぷりAI軍師の戦略相談</span>
-            </div>
-            <div className="w-2 h-2 rounded-full bg-red-500 animate-ping"></div>
-          </div>
-          
-          <div className="p-6 space-y-6 bg-white">
-            <div className="space-y-3">
-              <label className="text-xs font-black text-zinc-500 uppercase tracking-widest flex items-center gap-2 ml-1">
-                <User size={16} className="text-red-500" /> 覚醒させたい超人の名前を記入
-              </label>
-              <input 
-                type="text" 
-                value={charName}
-                onChange={(e) => setCharName(e.target.value)}
-                placeholder="例: 悪魔将軍"
-                className="w-full p-5 bg-zinc-50 rounded-[1.5rem] text-lg font-black outline-none border-2 border-zinc-100 focus:border-red-500 transition-all shadow-inner placeholder:text-zinc-300"
-              />
-              {!charName && <p className="text-[10px] text-red-500 font-black ml-1 animate-pulse italic">※診断には超人名が必要です</p>}
-            </div>
-
-            <button 
-              onClick={askAI}
-              disabled={!charName || isAiLoading}
-              className={`w-full py-5 rounded-[1.5rem] flex items-center justify-center gap-3 font-black text-base transition-all shadow-xl active:scale-95 ${!charName || isAiLoading ? 'bg-zinc-100 text-zinc-300 cursor-not-allowed shadow-none' : 'bg-red-600 text-white hover:bg-red-700 hover:shadow-red-200'}`}
-            >
-              {isAiLoading ? (
-                <Loader2 className="animate-spin" size={24} />
-              ) : (
-                <MessageSquareQuote size={24} />
-              )}
-              軍師に最終診断を仰ぐ
-            </button>
-            
-            {aiAnalysis && !isAiLoading && (
-              <div className="mt-4 p-6 bg-zinc-900 rounded-[1.5rem] border-2 border-red-600/30 shadow-2xl relative overflow-hidden">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="h-0.5 w-6 bg-red-600"></div>
-                  <span className="text-[10px] font-black text-red-500 tracking-[0.4em] uppercase">Tactical Intelligence Report</span>
-                </div>
-                <p className="text-sm leading-relaxed text-slate-100 font-medium italic relative z-10 selection:bg-red-500 selection:text-white">
-                  {aiAnalysis}
-                </p>
-                <div className="absolute top-0 right-0 p-4 opacity-5">
-                   <Sparkles size={100} />
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-
       </main>
 
       <style>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        ::selection { background: #fee2e2; color: #991b1b; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
       `}</style>
     </div>
   );
